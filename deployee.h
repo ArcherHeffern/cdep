@@ -22,7 +22,7 @@ typedef struct {
     char *name;
     char *executable_location;
     char *start_command;
-    char *remote_name;
+    Remote *remote;
 } Service;
 
 typedef struct {
@@ -51,7 +51,7 @@ void remote_print(Remote *remote);
 void remote_destroy(Remote *remote);
 
 
-Service* service_init(char *name, char *executable_location, char *start_command, char *remote_name);
+Service* service_init(char *name, char *executable_location, char *start_command, Remote *remote);
 void parse_service(FILE *file, char *line);
 void service_print(Service *service);
 void service_destroy(Service *service);
@@ -63,5 +63,7 @@ void parse_section(FILE *file, char *line);
 
 char* get_resource_name(char *line);
 int get_str(FILE *file, char** out);
+
+void deploy();
 
 #endif 

@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <sys/wait.h>
 #include <stdbool.h>
 #include <string.h>
 #include <sys/types.h>
@@ -69,6 +70,9 @@ int main(int argc, char** argv) {
                 printf("Unrecognized option: %s\n", line);
 		}
     }
+	
+	deploy();
+
     remotes_destroy(remotes);
     services_destroy(services);
     free(line);
@@ -138,8 +142,10 @@ void parse_service(FILE *file, char *line) {
     char *name;
     char *executable_location;
     char *start_command;
-    char *remote_name;
+	char *remote_name;
+	int i;
     Service *service;
+	Remote *remote = NULL;
 
     name = get_resource_name(line);
 
@@ -152,12 +158,21 @@ void parse_service(FILE *file, char *line) {
     if (get_str(file, &remote_name) <= 0) {
         fprintf(stderr, "Error getting remote name in %s\n", name);
     }
-    service = service_init(name, executable_location, start_command, remote_name);
+	for (i = 0; i < remotes->size; i++) {
+		if (strcmp(remotes->remotes[i]->name, remote_name) == 0) {
+			remote = remotes->remotes[i];
+			break;
+		}
+	}
+	if (remote == NULL) {
+		fprintf(stderr, "Remote [%s] does not exist in %s\n", remote_name, name);
+		exit(1);
+	}
+    service = service_init(name, executable_location, start_command, remote);
     if (!services_insert(services, service)) {
         fprintf(stderr, "[%s] is duplicated\n", name);
         exit(1);
     }
-    service_print(service);
 }
 
 void parse_remote(FILE *file, char *line) {
@@ -186,7 +201,6 @@ void parse_remote(FILE *file, char *line) {
         fprintf(stderr, "[%s] is duplicated\n", name);
         exit(1);
     }
-    remote_print(remote);
 }
 
 ///////////////////////////////////////
@@ -300,12 +314,12 @@ void remote_destroy(Remote *remote) {
 	free(remote);
 }
 
-Service* service_init(char *name, char *executable_location, char *start_command, char *remote_name) {
+Service* service_init(char *name, char *executable_location, char *start_command, Remote *remote) {
 	Service *service = malloc(sizeof(Service));
 	service->name = name;
 	service->executable_location = executable_location;
 	service->start_command = start_command;
-	service->remote_name = remote_name;
+	service->remote = remote;
 	return service;
 }
 
@@ -313,13 +327,46 @@ void service_print(Service *service) {
     printf("name: %s\n", service->name);
     printf("executable location: %s\n", service->executable_location);
     printf("start command: %s\n", service->start_command);
-    printf("remote name: %s\n", service->remote_name);
+    printf("remote: %s\n", service->remote->name);
 }
 
 void service_destroy(Service *service) {
     free(service->name);
     free(service->executable_location);
     free(service->start_command);
-    free(service->remote_name);
 	free(service);
+}
+
+void deploy() {
+	// Assume error checking has already happened (ip address, 
+	int i;
+	int stat_loc;
+	int status_code;
+	char command[1024];
+	Service *service;
+
+	for (i = 0; i < services->size; i++) {
+		service = services->services[i];
+		if (fork() == 0) {
+			// Copy program over
+			// scp -r service->executable_location service->remote->username@service->remote->ip:~
+			// ssh service->remote->username@service->remote->ip service->start_command
+			exit(0);
+		}
+		wait(&stat_loc);
+		if (!WIFEXITED(stat_loc)) {
+			fprintf(stderr, "Failed to copy program over for %s\n", service->name);
+        }
+        status_code = WEXITSTATUS(stat_loc);
+        if (status_code != 0) {
+			fprintf(stderr, "Error copying program over for %s: Status code: %d\n", service->name, status_code);
+        }
+        if (fork() == 0) {
+            // Execute program
+			exit(0);
+        }
+		printf("__Service %d__\n", i + 1);
+		service_print(service);
+		printf("\n");
+    }
 }
