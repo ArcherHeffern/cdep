@@ -4,12 +4,12 @@
 #ifndef __DEPLOYEE__
 #define __DEPLOYEE__ 1
 
+void print_help();
 
 typedef struct {
     char *name;
     char *ip;
     char *username;
-    char *password;
 } Remote; 
 
 typedef struct {
@@ -45,7 +45,7 @@ void services_destroy(Services *services);
 bool remotes_insert(Remotes *remotes, Remote *remote);
 bool services_insert(Services *services, Service *service);
 
-Remote* remote_init(char *name, char *ip, char *username, char *password);
+Remote* remote_init(char *name, char *ip, char *username);
 void parse_remote(FILE *file, char *line);
 void remote_print(Remote *remote);
 void remote_destroy(Remote *remote);

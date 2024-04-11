@@ -1,12 +1,16 @@
 # Description
 IaC solution. Uses SSH under the hood
 
+# Setup 
+For each remote machine, enable ssh using:
+`ssh-keygen`
+`ssh-copy-id` 
+
 # Syntax
 __Remotes__  
 [Remote name]  
 remote_ip  
 remote_username  
-remote_password  
   
 __Services__  
 [Service Name]  
@@ -18,6 +22,8 @@ remote_name
 MINI NEXT: Abstract out to parser and types files
 NEXT: Execute program
 NEXT NEXT: Create type checking step
+- Ability to stop deployed programs
+- Stop previously ran programs when starting again
 - Allow for pulling from git repositories
 - Declaring of dependencies - This will allow for multithreading optimizations
 - Hostname instead of ip address

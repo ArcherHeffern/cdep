@@ -45,6 +45,12 @@ int main(int argc, char** argv) {
         exit(1);
     }
     file_name = argv[1];
+
+	if (strcmp(file_name, "--help") == 0 || strcmp(file_name, "-h") == 0) {
+		print_help();
+		exit(0);
+	}
+
     if (access(file_name, R_OK) == -1) {
         perror("Access");
         exit(1);
@@ -179,7 +185,6 @@ void parse_remote(FILE *file, char *line) {
 	char *name;
     char *ip;
     char *username;
-    char *password;
 
     name = get_resource_name(line);
 
@@ -191,12 +196,8 @@ void parse_remote(FILE *file, char *line) {
         fprintf(stderr, "Error getting username in %s\n", name);
         exit(1);
     }
-    if (get_str(file, &password) <= 0) {
-        fprintf(stderr, "Error getting password in %s\n", name);
-        exit(1);
-    }
 
-    Remote* remote = remote_init(name, ip, username, password);
+    Remote* remote = remote_init(name, ip, username);
     if (!remotes_insert(remotes, remote)) {
         fprintf(stderr, "[%s] is duplicated\n", name);
         exit(1);
@@ -290,12 +291,11 @@ bool services_insert(Services *services, Service *service) {
 // REMOTE and SERVICE FUNCTIONS //
 //////////////////////////////////
 
-Remote* remote_init(char *name, char *ip, char *username, char *password) {
+Remote* remote_init(char *name, char *ip, char *username) {
 	Remote *remote = malloc(sizeof(Remote));
 	remote->name = name;
 	remote->ip = ip;
 	remote->username = username;
-	remote->password = password;
 	return remote;
 }
 
@@ -303,13 +303,11 @@ void remote_print(Remote *remote) {
 	printf("name: %s\n", remote->name);
 	printf("ip: %s\n", remote->ip);
 	printf("username: %s\n", remote->username);
-	printf("password: %s\n", remote->password);
 }
 
 void remote_destroy(Remote *remote) {
     free(remote->ip);
     free(remote->name);
-    free(remote->password);
     free(remote->username);
 	free(remote);
 }
@@ -342,31 +340,73 @@ void deploy() {
 	int i;
 	int stat_loc;
 	int status_code;
-	char command[1024];
+	char *remote_str = NULL;
+	char *command_str = NULL;
+	int dev_null = open("/dev/null", O_WRONLY);
 	Service *service;
 
 	for (i = 0; i < services->size; i++) {
 		service = services->services[i];
 		if (fork() == 0) {
-			// Copy program over
+			dup2(dev_null, 1);
+			dup2(dev_null, 2);
+			asprintf(&remote_str, "%s@%s:~", service->remote->username, service->remote->ip);
 			// scp -r service->executable_location service->remote->username@service->remote->ip:~
-			// ssh service->remote->username@service->remote->ip service->start_command
-			exit(0);
+			if (execlp("scp", "scp", "-r", service->executable_location, remote_str, NULL) == -1) {
+				perror("execlp");
+				exit(1);
+			}
 		}
 		wait(&stat_loc);
 		if (!WIFEXITED(stat_loc)) {
 			fprintf(stderr, "Failed to copy program over for %s\n", service->name);
+			exit(1);
         }
         status_code = WEXITSTATUS(stat_loc);
         if (status_code != 0) {
 			fprintf(stderr, "Error copying program over for %s: Status code: %d\n", service->name, status_code);
+			exit(1);
         }
         if (fork() == 0) {
-            // Execute program
-			exit(0);
+			// screen -d -m
+			asprintf(&remote_str, "%s@%s", service->remote->username, service->remote->ip);
+			asprintf(&command_str, "screen -d -m %s", service->start_command);
+			dup2(dev_null, 1);
+			dup2(dev_null, 2);
+			
+			// ssh service->remote->username@service->remote->ip service->start_command
+			// nohup ssh 127.0.0.1:8080 python service.py
+			if (execlp("ssh", "ssh", remote_str, command_str, NULL) == -1) {
+				perror("execlp");
+				exit(1);
+			}
         }
-		printf("__Service %d__\n", i + 1);
-		service_print(service);
-		printf("\n");
+		wait(&stat_loc);
+		if (!WIFEXITED(stat_loc)) {
+			fprintf(stderr, "Failed to start program for %s\n", service->name);
+			exit(1);
+        }
+        status_code = WEXITSTATUS(stat_loc);
+        if (status_code != 0) {
+			fprintf(stderr, "Error starting program for %s: Status code: %d\n", service->name, status_code);
+			exit(1);
+        }
+		printf("__Service %s running__\n", service->name);
     }
+}
+
+void print_help() {
+	printf("__Remotes__\n");
+	printf("[Remote name]\n");
+	printf("remote_ip\n");
+	printf("remote_username\n");
+	printf("\n");
+	printf("__Services__\n");
+	printf("[Service Name]\n");
+	printf("executable_location\n");
+	printf("start_command\n");
+	printf("remote_name\n");
+	printf("\n");
+	printf("Notes: \n");
+	printf("Remotes must be declared before the services which reference them\n");
 }
