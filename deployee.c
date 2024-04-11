@@ -23,7 +23,15 @@ char *remote_header  = "__remotes__";
 
 int main(int argc, char** argv) {
     remotes = remotes_init(8);
+	if (remotes == NULL) {
+		fprintf(stderr, "Failed to create remotes array\n");
+		exit(1);
+	}
     services = services_init(8);
+	if (services == NULL) {
+		fprintf(stderr, "Failed to create services array\n");
+		exit(1);
+	}
 
     char *file_name;
     FILE *file;
@@ -59,15 +67,12 @@ int main(int argc, char** argv) {
                 break;
             default:
                 printf("Unrecognized option: %s\n", line);
-            }
-        if (line) {
-        }
+		}
     }
     remotes_destroy(remotes);
     services_destroy(services);
     free(line);
     fclose(file);
-
 }
 
 void parse_header(char *line) {
@@ -88,21 +93,29 @@ void parse_section(FILE *file, char *line) {
 		parse_remote(file, line);
 	} else {
 		fprintf(stderr, "Define a section header before declaring a resource\n");
+		exit(1);
 	}	
 }
 
 int get_str(FILE *file, char** out) {
     size_t n = 0;
     int n_read;
-    char *line;
+    char *line = NULL;
+	char *new_str;
 
     n_read = getline(&line, &n, file);
     n_read = strip(&line, n_read);
     if (n_read == 0) {
         return 0;
     }
-    *out = malloc(n_read * sizeof(char) + 1);
+    new_str = malloc(n_read * sizeof(char) + 1);
+	if (new_str == NULL) {
+		perror("Malloc");
+		exit(1);
+	}
+	*out = new_str;
     strcpy(*out, line);
+	free(line);
     return n_read;
 }
 
@@ -150,7 +163,6 @@ void parse_service(FILE *file, char *line) {
 void parse_remote(FILE *file, char *line) {
 	char *name;
     char *ip;
-    int port;
     char *username;
     char *password;
 
@@ -182,10 +194,20 @@ void parse_remote(FILE *file, char *line) {
 ///////////////////////////////////////
 
 Remotes* remotes_init(int capacity) {
+	if (capacity <= 0) {
+		return NULL;
+	}
     Remotes *remotes = malloc(sizeof(Remotes));
+	if (remotes == NULL) {
+		return NULL;
+	}
     remotes->capacity = capacity;
     remotes->size = 0;
-    remotes->remotes = malloc(sizeof(Remote*));
+    remotes->remotes = malloc(sizeof(Remote*) * capacity);
+	if (remotes->remotes == NULL) {
+		free(remotes);
+		return NULL;
+	}
     return remotes;
 }
 void remotes_destroy(Remotes *remotes) {
@@ -197,10 +219,20 @@ void remotes_destroy(Remotes *remotes) {
     free(remotes);
 }
 Services* services_init(int capacity) {
+	if (capacity <= 0) {
+		return NULL;
+	}
     Services *services = malloc(sizeof(Services));
+	if (services == NULL) {
+		return NULL;
+	}
     services->size = 0;
     services->capacity = capacity;
-    services->services = malloc(sizeof(Service*));
+    services->services = malloc(sizeof(Service*) * capacity);
+	if (services->services == NULL) {
+		free(services);
+		return NULL;
+	}
     return services;
 }
 void services_destroy(Services *services) {
@@ -274,6 +306,7 @@ Service* service_init(char *name, char *executable_location, char *start_command
 	service->executable_location = executable_location;
 	service->start_command = start_command;
 	service->remote_name = remote_name;
+	return service;
 }
 
 void service_print(Service *service) {
