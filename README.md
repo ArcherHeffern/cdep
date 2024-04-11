@@ -2,17 +2,17 @@
 IaC solution. Uses SSH under the hood
 
 # Syntax
-__Remotes__
-[Remote name]
-remote_ip
-remote_username
-remote_password
-
-__Services__
-[Service Name]
-executable_location
-start_command
-remote_name
+__Remotes__  
+[Remote name]  
+remote_ip  
+remote_username  
+remote_password  
+  
+__Services__  
+[Service Name]  
+executable_location  
+start_command  
+remote_name  
 
 # TODO
 MINI NEXT: Abstract out to parser and types files
