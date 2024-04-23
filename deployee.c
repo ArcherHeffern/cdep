@@ -61,6 +61,7 @@ int main(int argc, char** argv) {
         exit(1);
     }
     while ((num_read = getline(&line, &n, file)) != -1) {
+		tokens = tokenize(&line);
         num_read = strip(&line, num_read);
         if (num_read == 0) {
             continue;
@@ -84,6 +85,16 @@ int main(int argc, char** argv) {
     free(line);
     fclose(file);
 }
+
+/*
+@param line Input line to be tokenized
+@param tokens Output tokens
+@return number of tokens
+*/
+int tokenize(char* line, Token **tokens) {
+	
+}
+
 
 void parse_header(char *line) {
 	if (strcmp(line, service_header) == 0) {
